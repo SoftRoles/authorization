@@ -1,17 +1,48 @@
 var express = require('express');
-var request = require('request');
 
 var passport = require('passport');
 var passStrategyLocal = require('passport-local').Strategy;
 
+var session = require('express-session');
+var mongodbSessionStore = require('connect-mongodb-session')(session);
+
+var mongoClient = require("mongodb").MongoClient
+var mongodbUrl = "mongodb://127.0.0.1:27017"
+
 // Create a new Express application.
 var app = express();
+
+var store = new mongodbSessionStore(
+  {
+    uri: mongodbUrl,
+    databaseName: 'auth',
+    collection: 'sessions'
+  });
+
+// Catch errors
+store.on('error', function (error) {
+  assert.ifError(error);
+  assert.ok(false);
+});
+
+app.use(require('express-session')({
+  secret: 'This is a secret',
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
+  },
+  store: store,
+  // Boilerplate options, see:
+  // * https://www.npmjs.com/package/express-session#resave
+  // * https://www.npmjs.com/package/express-session#saveuninitialized
+  resave: true,
+  saveUninitialized: true
+}));
+
 
 app.use(require("body-parser").json())
 app.use(require("body-parser").urlencoded({ extended: true }))
 app.use(require("cors")())
 app.use(require('morgan')('tiny'));
-app.use("/bower_components", express.static(__dirname + "/public/bower_components"))
 app.use("/login/bower_components", express.static(__dirname + "/public/bower_components"))
 
 //==================================================================================================
@@ -24,15 +55,14 @@ app.use("/login/bower_components", express.static(__dirname + "/public/bower_com
 // that the password is correct and then invoke `cb` with a user object, which
 // will be set at `req.user` in route handlers after authentication.
 passport.use(new passStrategyLocal(function (username, password, cb) {
-  request({
-    url: "http://127.0.0.1:3000/mongodb/api/auth/users?username=" + username + "&password=" + password,
-    headers: { "Authorization": "Bearer %Sdf1234" }
-  }, function (err, res, body) {
-    var users = JSON.parse(body)
-    if (err) return cb(err)
-    if (!users.length) { return cb(null, false); }
-    return cb(null, users[0]);
-  })
+  mongoClient.connect(mongodbUrl + "/auth", function (err, client) {
+    client.db("auth").collection("users").findOne({ username: username, password:password }, function (err, user) {
+      if (err) return cb(err)
+      if (!user) { return cb(null, false); }
+      return cb(null, user);
+      db.close();
+    });
+  });
 }));
 
 
@@ -44,26 +74,20 @@ passport.use(new passStrategyLocal(function (username, password, cb) {
 // serializing, and querying the user record by ID from the database when
 // deserializing.
 passport.serializeUser(function (user, cb) {
-  // console.log("[3005-mongodb]: passport.serializeUser", user)
   cb(null, user.username);
 });
 
 passport.deserializeUser(function (username, cb) {
-  request({
-    url: "http://127.0.0.1:3000/mongodb/api/auth/users?username=" + username,
-    headers: { "Authorization": "Bearer %Sdf1234" }
-  }, function (err, res, body) {
-    var users = JSON.parse(body)
-    if (err) return cb(err)
-    if (!users.length) { return cb(null, false); }
-    return cb(null, users[0]);
-  })
+  mongoClient.connect(mongodbUrl + "/auth", function (err, client) {
+    client.db("auth").collection("users").findOne({ username: username }, function (err, user) {
+      if (err) return cb(err)
+      if (!user) { return cb(null, false); }
+      return cb(null, user);
+      db.close();
+    });
+  });
 });
 
-
-// Use application-level middleware for common functionality, including
-// logging, parsing, and session handling.
-app.use(require('express-session')({ secret: 'keyboard cat', resave: false, saveUninitialized: false }));
 
 // Initialize Passport and restore authentication state, if any, from the
 // session.
@@ -75,18 +99,13 @@ app.get('/login', function (req, res) {
 });
 
 app.post('/login', passport.authenticate('local', { failureRedirect: '/login' }), function (req, res) {
-  // res.set({"Authorization": "Bearer " + req.user.token})
-  // res.header("Authorization", "Bearer " + req.user.token)
   res.redirect(req.query.source);
-  // console.log(req.isAuthenticated())
-  // res.send("OK")
 });
 
 app.get('/logout', function (req, res) {
   req.logout();
   res.redirect('/login');
 });
-
 
 app.listen(3007, function () {
   console.log("Service 3007-login running on http://127.0.0.1:3007")
