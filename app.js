@@ -107,6 +107,17 @@ app.get('/logout', function (req, res) {
   res.redirect('/login');
 });
 
+
+app.get('/user', require('connect-ensure-login').ensureLoggedIn(), function (req, res) {
+  mongoClient.connect(mongodbUrl + "/auth", function (err, client) {
+    client.db("auth").collection("users").findOne({ token: req.user.token }, function (err, user) {
+      if (err) res.send(err)
+      else res.send(user)
+      client.close();
+    });
+  });
+});
+
 app.listen(3007, function () {
   console.log("Service 3007-login running on http://127.0.0.1:3007")
 })
