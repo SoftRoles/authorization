@@ -1,4 +1,5 @@
 var express = require('express');
+var assert = require('assert');
 
 var passport = require('passport');
 var passStrategyLocal = require('passport-local').Strategy;
