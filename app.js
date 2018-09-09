@@ -57,7 +57,7 @@ app.use("/login/bower_components", express.static(__dirname + "/public/bower_com
 // will be set at `req.user` in route handlers after authentication.
 passport.use(new passStrategyLocal(function (username, password, cb) {
   mongoClient.connect(mongodbUrl + "/auth", function (err, client) {
-    client.db("auth").collection("users").findOne({ username: username, password:password }, function (err, user) {
+    client.db("auth").collection("users").findOne({ username: username, password: password }, function (err, user) {
       if (err) return cb(err)
       if (!user) { return cb(null, false); }
       return cb(null, user);
@@ -109,14 +109,17 @@ app.get('/logout', function (req, res) {
 });
 
 
-app.get('/user', require('connect-ensure-login').ensureLoggedIn(), function (req, res) {
-  mongoClient.connect(mongodbUrl + "/auth", function (err, client) {
-    client.db("auth").collection("users").findOne({ token: req.user.token }, function (err, user) {
-      if (err) res.send(err)
-      else res.send(user)
-      client.close();
+app.get('/user', function (req, res) {
+  if (req.user) {
+    mongoClient.connect(mongodbUrl + "/auth", function (err, client) {
+      client.db("auth").collection("users").findOne({ token: req.user.token }, function (err, user) {
+        if (err) res.send(err)
+        else res.send(user)
+        client.close();
+      });
     });
-  });
+  }
+  else res.send({})
 });
 
 app.listen(3007, function () {
