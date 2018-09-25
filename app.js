@@ -79,12 +79,12 @@ passport.serializeUser(function (user, cb) {
 });
 
 passport.deserializeUser(function (username, cb) {
-  mongoClient.connect(mongodbUrl + "/auth", function (err, client) {
+  mongoClient.connect(mongodbUrl, { useNewUrlParser: true }, function (err, client) {
     client.db("auth").collection("users").findOne({ username: username }, function (err, user) {
       if (err) return cb(err)
       if (!user) { return cb(null, false); }
       return cb(null, user);
-      db.close();
+      client.close();
     });
   });
 });
@@ -111,7 +111,7 @@ app.get('/logout', function (req, res) {
 
 app.get('/user', function (req, res) {
   if (req.user) {
-    mongoClient.connect(mongodbUrl + "/auth", function (err, client) {
+    mongoClient.connect(mongodbUrl, function (err, client) {
       client.db("auth").collection("users").findOne({ token: req.user.token }, function (err, user) {
         if (err) res.send(err)
         else res.send(user)
