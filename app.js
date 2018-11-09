@@ -99,7 +99,7 @@ app.get('/login', function (req, res) {
 });
 
 app.post('/login', passport.authenticate('local', { failureRedirect: '/login' }), function (req, res) {
-  res.redirect(req.query.source);
+  res.send(req.user)
 });
 
 app.get('/logout', function (req, res) {
