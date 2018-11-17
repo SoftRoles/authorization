@@ -107,6 +107,10 @@ app.get('/logout', function (req, res) {
   res.redirect('/login');
 });
 
+app.get('/403', function (req, res) {
+  res.sendStatus(403)
+});
+
 
 app.get('/user', function (req, res) {
   if (req.user) {
