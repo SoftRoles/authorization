@@ -15,7 +15,6 @@ mongoClient.connect(mongodbUrl, { poolSize: 10 }, function (err, client) {
   mongodb = client;
 });
 
-// Create a new Express application.
 var app = express();
 
 var store = new mongodbSessionStore(
@@ -37,29 +36,10 @@ app.use(require('express-session')({
     maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
   },
   store: store,
-  // Boilerplate options, see:
-  // * https://www.npmjs.com/package/express-session#resave
-  // * https://www.npmjs.com/package/express-session#saveuninitialized
   resave: true,
   saveUninitialized: true
 }));
 
-
-app.use(require("body-parser").json())
-app.use(require("body-parser").urlencoded({ extended: true }))
-app.use(require("cors")())
-app.use(require('morgan')('tiny'));
-app.use("/login/bower_components", express.static(__dirname + "/public/bower_components"))
-
-//==================================================================================================
-// Local Passport
-//==================================================================================================
-// Configure the local strategy for use by Passport.
-//
-// The local strategy require a `verify` function which receives the credentials
-// (`username` and `password`) submitted by the user.  The function must verify
-// that the password is correct and then invoke `cb` with a user object, which
-// will be set at `req.user` in route handlers after authentication.
 passport.use(new passStrategyLocal(function (username, password, cb) {
   mongodb.db("auth").collection("users").findOne({ username: username, password: password }, function (err, user) {
     if (err) return cb(err)
@@ -69,13 +49,6 @@ passport.use(new passStrategyLocal(function (username, password, cb) {
 }));
 
 
-// Configure Passport authenticated session persistence.
-//
-// In order to restore authentication state across HTTP requests, Passport needs
-// to serialize users into and deserialize users out of the session.  The
-// typical implementation of this is as simple as supplying the user ID when
-// serializing, and querying the user record by ID from the database when
-// deserializing.
 passport.serializeUser(function (user, cb) {
   cb(null, user.username);
 });
@@ -88,9 +61,6 @@ passport.deserializeUser(function (username, cb) {
   });
 });
 
-
-// Initialize Passport and restore authentication state, if any, from the
-// session.
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -103,14 +73,15 @@ app.post('/login', passport.authenticate('local', { failureRedirect: '/login' })
 });
 
 app.get('/logout', function (req, res) {
-  req.logout();
-  res.redirect('/login');
+  req.session.destroy(function (err) {
+    res.clearCookie('connect.sid');
+    res.redirect('/login');
+  });
 });
 
 app.get('/403', function (req, res) {
   res.sendStatus(403)
 });
-
 
 app.get('/user', function (req, res) {
   if (req.user) {
@@ -122,6 +93,11 @@ app.get('/user', function (req, res) {
   else res.send({})
 });
 
+app.use(require("body-parser").json())
+app.use(require("body-parser").urlencoded({ extended: true }))
+app.use(require("cors")())
+app.use(require('morgan')('tiny'));
+app.use("/login/bower_components", express.static(__dirname + "/public/bower_components"))
 app.listen(3007, function () {
   console.log("Service 3007-login running on http://127.0.0.1:3007")
 })
