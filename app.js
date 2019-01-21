@@ -45,11 +45,8 @@ app.use(require('express-session')({
 }));
 
 
-app.use(require("body-parser").json())
-app.use(require("body-parser").urlencoded({ extended: true }))
-app.use(require("cors")())
-app.use(require('morgan')('tiny'));
-app.use("/login/bower_components", express.static(__dirname + "/public/bower_components"))
+
+
 
 //==================================================================================================
 // Local Passport
@@ -94,6 +91,15 @@ passport.deserializeUser(function (username, cb) {
 app.use(passport.initialize());
 app.use(passport.session());
 
+var proxy = require('http-proxy-middleware');
+app.use('/authorize/service', proxy({ target: 'http://127.0.0.1:3005', pathRewrite: { '^/authorize/service': '' }, changeOrigin: true }));
+
+app.use(require("body-parser").json())
+app.use(require("body-parser").urlencoded({ extended: true }))
+app.use(require("cors")())
+app.use(require('morgan')('tiny'));
+app.use("/login/bower_components", express.static(__dirname + "/public/bower_components"))
+
 app.get('/login', function (req, res) {
   res.sendFile(__dirname + '/public/index.html');
 });
@@ -121,6 +127,7 @@ app.get('/user', function (req, res) {
   }
   else res.send({})
 });
+
 
 app.listen(3007, function () {
   console.log("Service 3007-login running on http://127.0.0.1:3007")
