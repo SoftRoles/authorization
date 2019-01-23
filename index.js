@@ -72,6 +72,24 @@ app.use('/authorize/service', proxy({ target: 'http://127.0.0.1:3005', pathRewri
 //-------------------------------------
 // common middlewares
 //-------------------------------------
+app.use(require('@softroles/authorize-bearer-token')(function(token, cb){
+  let options = {
+    url: databaseApi + '/auth/users',
+    form: {
+      token: token,
+    }
+  };
+  request.get(options, (err, response, body) => {
+    if (err) {
+      console.error(err)
+      return cb(null);
+    }
+    else if (body.length == 0) {
+      cb(null)
+    }
+    else cb(null, body[0])
+  })
+}))
 app.use(require('@softroles/authorize-local-user')())
 app.use(require('morgan')('tiny'));
 app.use(require('body-parser').json())
