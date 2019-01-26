@@ -1,49 +1,77 @@
 //=============================================================================
+// modules
+//=============================================================================
+const express = require('express');
+const assert = require('assert');
+const argparse = require('argparse').ArgumentParser
+const session = require('express-session');
+const mongodbSessionStore = require('connect-mongodb-session')(session);
+const passport = require('passport');
+const proxy = require('http-proxy-middleware');
+
+//-------------------------------------
+// arguments
+//-------------------------------------
+const argParser = new argparse({
+  addHelp: true,
+  description: 'Authorization service'
+})
+argParser.addArgument(['-p', '--port'], { help: 'Listening port', defaultValue: '3007' })
+const args = argParser.parseArgs()
+
+//-------------------------------------
+// mongodb
+//-------------------------------------
+let mongodb;
+const mongoClient = require("mongodb").MongoClient
+const mongodbUrl = "mongodb://127.0.0.1:27017"
+mongoClient.connect(mongodbUrl, { poolSize: 10, useNewUrlParser: true }, function (err, client) {
+  assert.equal(null, err);
+  mongodb = client;
+});
+
+//=============================================================================
 // http server
 //=============================================================================
-var express = require('express');
-var app = express();
-
+const app = express();
 
 //-------------------------------------
-// session manangement
+// session store
 //-------------------------------------
+var store = new mongodbSessionStore({
+  uri: mongodbUrl,
+  databaseName: 'auth',
+  collection: 'sessions'
+});
+
+// Catch errors
+store.on('error', function (error) {
+  assert.ifError(error);
+  assert.ok(false);
+});
+
 var sessionOptions = {
   secret: 'This is a secret',
   cookie: {
     maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
   },
-  resave: false,
-  saveUninitialized: false
+  store: store,
+  resave: true,
+  saveUninitialized: true
 }
-app.use(require('express-session')(sessionOptions));
+
+app.use(session(sessionOptions));
 
 //-------------------------------------
 // authentication
 //-------------------------------------
-var passport = require('passport');
-var request = require('request');
-var databaseApi = 'http://127.0.0.1/database/api'
-
 var passStrategyLocal = require('passport-local').Strategy;
 passport.use(new passStrategyLocal(function (username, password, cb) {
-  let options = {
-    url: databaseApi + '/auth/users',
-    form: {
-      username: username,
-      password: password
-    }
-  };
-  request.get(options, (err, response, body) => {
-    if (err) {
-      console.error(err)
-      return cb(err);
-    }
-    else if (body.length == 0) {
-      cb(null, false)
-    }
-    else cb(null, body[0])
-  })
+  mongodb.db("auth").collection("users").findOne({ username: username, password: password }, function (err, user) {
+    if (err) return cb(err)
+    if (!user) { return cb(null, false); }
+    return cb(null, user);
+  });
 }));
 
 passport.serializeUser(function (user, cb) {
@@ -58,38 +86,25 @@ passport.deserializeUser(function (username, cb) {
   });
 });
 
-// Initialize Passport and restore authentication state, if any, from the
-// session.
 app.use(passport.initialize());
 app.use(passport.session());
+
+app.use(require('@softroles/authorize-bearer-token')(function (token, cb) {
+  mongodb.db("auth").collection("users").findOne({ token: token }, function (err, user) {
+    if (err) return cb(err)
+    if (!user) { return cb(null, false); }
+    return cb(null, user);
+  });
+}))
 
 //-------------------------------------
 // proxies
 //-------------------------------------
-var proxy = require('http-proxy-middleware');
-app.use('/authorize/service', proxy({ target: 'http://127.0.0.1:3005', pathRewrite: { '^/authorize/service': '' }, changeOrigin: true }));
+app.use('/authorize/service', proxy({ target: 'http://127.0.0.1/authorized', pathRewrite: { '^/authorize/service': '' }, changeOrigin: true }));
 
 //-------------------------------------
 // common middlewares
 //-------------------------------------
-app.use(require('@softroles/authorize-bearer-token')(function(token, cb){
-  let options = {
-    url: databaseApi + '/auth/users',
-    form: {
-      token: token,
-    }
-  };
-  request.get(options, (err, response, body) => {
-    if (err) {
-      console.error(err)
-      return cb(null);
-    }
-    else if (body.length == 0) {
-      cb(null)
-    }
-    else cb(null, body[0])
-  })
-}))
 app.use(require('@softroles/authorize-local-user')())
 app.use(require('morgan')('tiny'));
 app.use(require('body-parser').json())
@@ -99,60 +114,22 @@ app.use(require("cors")())
 //=============================================================================
 // api
 //=============================================================================
-app.get('/authorization/api', function (req, res) {
-  res.send({});
-});
-
-
-app.get('/login', function (req, res) {
-  res.sendFile(__dirname + '/public/index.html');
-});
-
-app.post('/login', passport.authenticate('local', { failureRedirect: '/login' }), function (req, res) {
+app.post('/authorization/api/v1/login', passport.authenticate('local', { failureRedirect: 'http://127.0.0.1/login' }), function (req, res) {
   res.redirect(req.query.source);
 });
 
-app.get('/logout', function (req, res) {
+app.get('/authorization/api/v1/logout', function (req, res) {
   req.logout();
-  res.redirect('/login');
+  res.redirect('http://127.0.0.1/login');
 });
 
-app.get('/403', function (req, res) {
-  res.sendStatus(403)
-});
-
-
-app.get('/user', function (req, res) {
-  if (req.user) {
-    mongodb.db("auth").collection("users").findOne({ token: req.user.token }, function (err, user) {
-      if (err) res.send(err)
-      else res.send(user)
-    });
-  }
-  else res.send({})
+app.get('/authorization/api/v1/user', function (req, res) {
+  res.send(req.user)
 });
 
 //=============================================================================
-// start and register service
+// start service
 //=============================================================================
-var path = require('path')
-var findFreePort = require('find-free-port')
-var userEnvVariable = require('@softroles/user-env-variable')
-var assert = require('assert')
-var serviceName = path.basename(__dirname).toUpperCase()
-findFreePort(3000, function (err, port) {
-  assert.equal(err, null, 'Could not find a free tcp port.')
-  app.listen(Number(port), function () {
-    var registers = {
-      ['SOFTROLES_SERVICE_' + serviceName + '_PORT']: port
-    }
-    console.log("Service is registered with following variables:")
-    for (reg in registers) {
-      console.log('\t - SOFTROLES_SERVICE_' + serviceName + '_PORT', '=', port)
-      userEnvVariable.set('SOFTROLES_SERVICE_' + serviceName + '_PORT', port, function (err) {
-        assert.equal(err, null, 'Could not register service.')
-        console.log("Service running on http://127.0.0.1:" + port)
-      })
-    }
-  })
+app.listen(Number(args.port), function () {
+  console.log(`Service running on http://127.0.0.1:${args.port}`)
 })

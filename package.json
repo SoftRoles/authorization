@@ -1,7 +1,7 @@
 {
-  "name": "3007-login",
-  "version": "1.0.0",
-  "description": "",
+  "name": "login",
+  "version": "1.1.0",
+  "description": "Authorization service",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,18 +11,16 @@
   "dependencies": {
     "@softroles/authorize-bearer-token": "^1.0.0",
     "@softroles/authorize-local-user": "^1.2.0",
-    "@softroles/user-env-variable": "^1.2.2",
+    "argparse": "^1.0.10",
     "body-parser": "^1.18.3",
     "connect-mongodb-session": "^2.0.2",
     "cors": "^2.8.4",
     "express": "^4.16.3",
     "express-session": "^1.15.6",
-    "find-free-port": "^2.0.0",
     "http-proxy-middleware": "^0.19.1",
     "mongodb": "^3.1.6",
     "morgan": "^1.9.0",
     "passport": "^0.4.0",
-    "passport-local": "^1.0.0",
-    "request": "^2.88.0"
+    "passport-local": "^1.0.0"
   }
 }
