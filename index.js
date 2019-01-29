@@ -124,7 +124,8 @@ app.get('/authorization/api/v1/logout', function (req, res) {
 });
 
 app.get('/authorization/api/v1/user', function (req, res) {
-  res.send(req.user)
+  if(req.user) res.send(user)
+  else res.send({})
 });
 
 //=============================================================================
