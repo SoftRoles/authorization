@@ -100,12 +100,12 @@ app.use(require('@softroles/authorize-bearer-token')(function (token, cb) {
 //-------------------------------------
 // proxies
 //-------------------------------------
-app.use('/authorize/service', proxy({ target: 'http://127.0.0.1/authorized', pathRewrite: { '^/authorize/service': '' }, changeOrigin: true }));
+// app.use('/authorize/service', proxy({ target: 'http://127.0.0.1/authorized', pathRewrite: { '^/authorize/service': '' }, changeOrigin: true }));
 
 //-------------------------------------
 // common middlewares
 //-------------------------------------
-app.use(require('@softroles/authorize-local-user')())
+// app.use(require('@softroles/authorize-local-user')())
 app.use(require('morgan')('tiny'));
 app.use(require('body-parser').json())
 app.use(require('body-parser').urlencoded({ extended: true }));
