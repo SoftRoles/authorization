@@ -114,13 +114,13 @@ app.use(require("cors")())
 //=============================================================================
 // api
 //=============================================================================
-app.post('/authorization/api/v1/login', passport.authenticate('local', { failureRedirect: 'http://127.0.0.1/login' }), function (req, res) {
+app.post('/authorization/api/v1/login', passport.authenticate('local', { failureRedirect: '/login' }), function (req, res) {
   res.redirect(req.query.source);
 });
 
 app.get('/authorization/api/v1/logout', function (req, res) {
   req.logout();
-  res.redirect('http://127.0.0.1/login');
+  res.redirect('/login');
 });
 
 app.get('/authorization/api/v1/user', function (req, res) {
