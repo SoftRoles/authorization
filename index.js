@@ -115,7 +115,7 @@ app.use(require("cors")())
 // api
 //=============================================================================
 app.post('/authorization/api/v1/login', passport.authenticate('local', { failureRedirect: '/login' }), function (req, res) {
-  res.redirect(req.query.source);
+  res.redirect('/'+req.query.source);
 });
 
 app.get('/authorization/api/v1/logout', function (req, res) {
