@@ -8,6 +8,7 @@ const session = require('express-session');
 const mongodbSessionStore = require('connect-mongodb-session')(session);
 const passport = require('passport');
 const proxy = require('http-proxy-middleware');
+const { noCache } = require('helmet')
 
 //-------------------------------------
 // arguments
@@ -105,7 +106,7 @@ app.use(require('@softroles/authorize-bearer-token')(function (token, cb) {
 //-------------------------------------
 // common middlewares
 //-------------------------------------
-// app.use(require('@softroles/authorize-local-user')())
+app.use(noCache())
 app.use(require('morgan')('tiny'));
 app.use(require('body-parser').json())
 app.use(require('body-parser').urlencoded({ extended: true }));
@@ -119,6 +120,9 @@ app.post('/authorization/api/v1/login', passport.authenticate('local', { failure
 });
 
 app.get('/authorization/api/v1/logout', function (req, res) {
+  req.session.auth = null
+  res.clearCookie('auth')
+  req.session.destroy(function(){})
   req.logout();
   res.redirect('/login');
 });
